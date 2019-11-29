@@ -10,6 +10,7 @@
 
 #define Append(destination, source) wcscat_s ((wchar_t *)(destination), (int)(BUFFER_SIZE), (wchar_t *)(source));
 
+INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int);
 LRESULT WindowProc(HWND, UINT, WPARAM, LPARAM);
 void Init(HINSTANCE);
 void Release();

@@ -40,7 +40,6 @@ const wchar_t *const failCopyingMemoryString = L"Failed to copy file name from y
 const wchar_t *const failStartingRemoteProcedureString = L"Failed to start remote thread on selected function in selected remote process!";
 
 int buttonWidth, buttonHeight, processesCount, openedProcessesCount;
-wchar_t *processName, *libraryName;
 char *functionName;
 RECT clientRect = {0, 0, 1600, 900}, injectPanelRect;
 HFONT hStaticFont;
@@ -49,7 +48,7 @@ HANDLE processes[MAX_PROCESSES_COUNT], hSelectedProcess;
 HWND buttons[MAX_PROCESSES_COUNT], hMainWindow, hStaticLeft, hStaticRight, hProcessNameEdit, hLibraryNameEdit, hFunctionNameEdit, hInjectButton;
 HMODULE *processModules[MAX_PROCESSES_COUNT], hKernel32;
 MODULEINFO *processModulesInfo[MAX_PROCESSES_COUNT];
-wchar_t *processNames[MAX_PROCESSES_COUNT];
+wchar_t *processNames[MAX_PROCESSES_COUNT], *processName, *libraryName;
 
 WNDCLASSEXW WndClassEx = {sizeof(WNDCLASSEX), CS_GLOBALCLASS, (WNDPROC)WindowProc, 0, 0, 0, 0, 0, 0, 0, mainClassName, 0};
 
@@ -159,7 +158,7 @@ void Init(HINSTANCE hInstance)
 	AdjustWindowRect(&R, WINDOW_STYLE, FALSE);
 	WndClassEx.hInstance = hInstance;
 	WndClassEx.hCursor = LoadCursorW((HINSTANCE)0, IDC_ARROW);
-	RegisterClassEx(&WndClassEx);
+	RegisterClassExW(&WndClassEx);
 	hMainWindow = CreateWindowExW(0, mainClassName, caption, WINDOW_STYLE, 0, 0, R.right, R.bottom, (HWND)0, (HMENU)0, (HINSTANCE)0, (LPVOID)0);
 	GetProcessesList();
 	SetTimer(hMainWindow, (UINT_PTR)NULL, 1000 / UPDATE_RATE, (TIMERPROC)NULL);
@@ -221,14 +220,12 @@ void GetProcessesList()
 {
 
 	DWORD arraySize, cbNeeded;
-	size_t len;
 	int i, j, count, index, modulesCount;
 	BOOL arraysEquals;
 	HANDLE hProcess;
 	HWND hBtn;
 
 	arraySize = (DWORD)PROCESSES_BUFFER_SIZE;
-	len = arraySize * sizeof(DWORD);
 	arraysEquals = TRUE;
 	
 	if (!processIds) {
