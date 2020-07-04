@@ -1,47 +1,8 @@
 #include "Processes.h"
 
-#define mainClassName L"MainClass"
-
-const DWORD WINDOW_STYLE = WS_OVERLAPPEDWINDOW;
-const DWORD STATIC_STYLE = WS_CHILD | WS_VISIBLE | WS_THICKFRAME;
-const DWORD PROCESS_BUTTON_STYLE = WS_CHILD | WS_VISIBLE;
-const DWORD PROCESS_NAME_EDIT_STYLE = WS_CHILD | WS_VISIBLE | WS_BORDER | ES_CENTER;
-const DWORD LIBRARY_NAME_EDIT_STYLE = WS_CHILD | WS_VISIBLE | WS_BORDER | ES_CENTER;
-const DWORD FUNCTION_NAME_EDIT_STYLE = WS_CHILD | WS_VISIBLE | WS_BORDER | ES_CENTER;
-const DWORD INJECT_BUTTON_STYLE = WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER;
-const DWORD FILE_ACCESS_ATTRUBUTES = FILE_READ_DATA;
-const DWORD PROCESS_ACCESS_FLAGS = PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION;
-const DWORD PROTECT_FLAGS = PAGE_READWRITE;
-const DWORD REMOTE_THREAD_STACK_SIZE = 4096;
-const char *const loadLibraryString = "LoadLibraryW";
-const wchar_t *const caption = L"Processes";
-const wchar_t *const editClassName = L"EDIT";
-const wchar_t *const staticClassName = L"STATIC";
-const wchar_t *const buttonClassName = L"BUTTON";
-const wchar_t *const errorString = L"Error!";
-const wchar_t *const kernel32String = L"Kernel32.dll";
-const wchar_t *const staticFontName = L"Courier new";
-const wchar_t *const injectButtonText = L"INJECT!";
-const wchar_t *const successString = L"Successfully injected!";
-const wchar_t *const incorrectInputString = L"Incorrect input!";
-const wchar_t *const processNameEditText = L"Enter process name";
-const wchar_t *const libraryNameEditText = L"Enter library name";
-const wchar_t *const functionNameEditText = L"Enter function name";
-const wchar_t *const enterProcessNameString = L"Enter process name!";
-const wchar_t *const enterLibraryNameString = L"Enter library name!";
-const wchar_t *const enterFunctionNameString = L"Enter function name!";
-const wchar_t *const wrongProcessNameString = L"Incorrect process name!";
-const wchar_t *const wrongLibraryNameString = L"Incorrect library name!";
-const wchar_t *const wrongFunctionNameString = L"Incorrect function name!";
-const wchar_t *const libraryAnalyzeFailString = L"Failed to analyze library from this process!";
-const wchar_t *const libraryLoadingFailString = L"Failed to load library to the selected process!";
-const wchar_t *const failAllocatingMemoryString = L"Failed to allocate memory in selected process!";
-const wchar_t *const failCopyingMemoryString = L"Failed to copy file name from your process to selected process!";
-const wchar_t *const failStartingRemoteProcedureString = L"Failed to start remote thread on selected function in selected remote process!";
-
 int buttonWidth, buttonHeight, processesCount, openedProcessesCount;
 char *functionName;
-RECT clientRect = {0, 0, 1600, 900}, injectPanelRect;
+RECT clientRect, injectPanelRect;
 HFONT hStaticFont;
 DWORD *processIds, *processIdsOld;
 HANDLE processes[MAX_PROCESSES_COUNT], hSelectedProcess;
@@ -50,11 +11,13 @@ HMODULE *processModules[MAX_PROCESSES_COUNT], hKernel32;
 MODULEINFO *processModulesInfo[MAX_PROCESSES_COUNT];
 wchar_t *processNames[MAX_PROCESSES_COUNT], *processName, *libraryName;
 
-WNDCLASSEXW WndClassEx = {sizeof(WNDCLASSEX), CS_GLOBALCLASS, (WNDPROC)WindowProc, 0, 0, 0, 0, 0, 0, 0, mainClassName, 0};
+WNDCLASSEXW classEx =
+{
+	sizeof(WNDCLASSEX), 0, (WNDPROC)WindowProc, 0, 0, 0, 0, 0, 0, 0, MAIN_CLAS_NAME, 0
+};
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-	
 	MSG msg;
 
 	Init(hInstance);
@@ -66,13 +29,11 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	Release();
 
-	ExitProcess(0);
-
+	return 0;
 }
 
 LRESULT WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-
 	int source, index, i;
 	HANDLE handle;
 	PAINTSTRUCT ps;
@@ -96,15 +57,15 @@ LRESULT WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				wmemset(libraryName, (wchar_t)0, MAX_PATH);
 				memset(functionName, (char)0, MAX_PATH);
 				if (!GetWindowTextW(hProcessNameEdit, processName, MAX_PATH)) {
-					Error(enterProcessNameString, incorrectInputString);
+					Error(ENTER_PROCESS_NAME_STRING, INCORRECT_INPUT_STRING);
 					return 0;
 				}
 				if (!GetWindowTextW(hLibraryNameEdit, libraryName, MAX_PATH)) {
-					Error(enterLibraryNameString, incorrectInputString);
+					Error(ENTER_LIBRARY_NAME_STRING, INCORRECT_INPUT_STRING);
 					return 0;
 				}
 				if (!GetWindowTextA(hFunctionNameEdit, functionName, MAX_PATH)) {
-					Error(enterFunctionNameString, incorrectInputString);
+					Error(ENTER_FUNCTION_NAME_STRING, INCORRECT_INPUT_STRING);
 					return 0;
 				}
 				Inject(libraryName, processName, functionName);
@@ -146,44 +107,39 @@ LRESULT WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 	
 	return DefWindowProcW(hWnd, uMsg, wParam, lParam);
-
 }
 
 void Init(HINSTANCE hInstance)
 {
+	classEx.hInstance = hInstance;
+	classEx.hCursor = LoadCursorW((HINSTANCE)0, IDC_ARROW);
+	RegisterClassExW(&classEx);
 
-	RECT R;
-
-	R = clientRect;
-	AdjustWindowRect(&R, WINDOW_STYLE, FALSE);
-	WndClassEx.hInstance = hInstance;
-	WndClassEx.hCursor = LoadCursorW((HINSTANCE)0, IDC_ARROW);
-	RegisterClassExW(&WndClassEx);
-	hMainWindow = CreateWindowExW(0, mainClassName, caption, WINDOW_STYLE, 0, 0, R.right, R.bottom, (HWND)0, (HMENU)0, (HINSTANCE)0, (LPVOID)0);
+	hMainWindow = CreateWindowExW(0, MAIN_CLAS_NAME, CAPTION, WINDOW_STYLE,
+		0, 0, 1600, 900, (HWND)0, (HMENU)0, (HINSTANCE)0, (LPVOID)0);
 	GetProcessesList();
 	SetTimer(hMainWindow, (UINT_PTR)NULL, 1000 / UPDATE_RATE, (TIMERPROC)NULL);
 	
-	hStaticFont = CreateFontW(18, 10, 0, 0, FW_NORMAL, 0, 0, 0, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, FIXED_PITCH | FF_MODERN, staticFontName);
+	hStaticFont = CreateFontW(18, 10, 0, 0, FW_NORMAL, 0, 0, 0,
+		ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, FIXED_PITCH | FF_MODERN, STATIC_FONT_NAME);
 
 	ShowWindow(hMainWindow, SW_SHOWNORMAL);
 	UpdateWindow(hMainWindow);
 
-	hProcessNameEdit = CreateWindowExW(0, editClassName, processNameEditText, PROCESS_NAME_EDIT_STYLE, buttonWidth * 3, 0, buttonWidth, 50, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
-	hLibraryNameEdit = CreateWindowExW(0, editClassName, libraryNameEditText, LIBRARY_NAME_EDIT_STYLE, buttonWidth * 3, 50, buttonWidth, 50, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
-	hFunctionNameEdit = CreateWindowExW(0, editClassName, functionNameEditText, FUNCTION_NAME_EDIT_STYLE, buttonWidth * 3, 100, buttonWidth, 50, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
-	hInjectButton = CreateWindowExW(0, buttonClassName, injectButtonText, INJECT_BUTTON_STYLE, buttonWidth * 3, 150, buttonWidth, buttonWidth, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
+	hProcessNameEdit = CreateWindowExW(0, EDIT_CLASS_NAME, PROCESS_NAME_EDIT_TEXT, PROCESS_NAME_EDIT_STYLE, buttonWidth * 3, 0, buttonWidth, 50, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
+	hLibraryNameEdit = CreateWindowExW(0, EDIT_CLASS_NAME, LIBRARY_NAME_EDIT_TEXT, LIBRARY_NAME_EDIT_STYLE, buttonWidth * 3, 50, buttonWidth, 50, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
+	hFunctionNameEdit = CreateWindowExW(0, EDIT_CLASS_NAME, FUNCTION_NAME_EDIT_TEXT, FUNCTION_NAME_EDIT_STYLE, buttonWidth * 3, 100, buttonWidth, 50, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
+	hInjectButton = CreateWindowExW(0, BUTTON_CLASS_NAME, INJECT_BUTTON_TEXT, INJECT_BUTTON_STYLE, buttonWidth * 3, 150, buttonWidth, buttonWidth, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
 	
 	processName = (wchar_t *)calloc(MAX_PATH, sizeof(wchar_t));
 	libraryName = (wchar_t *)calloc(MAX_PATH, sizeof(wchar_t));
 	functionName = (char *)calloc(MAX_PATH, sizeof(char));
 
-	hKernel32 = GetModuleHandleW(kernel32String);
-
+	hKernel32 = GetModuleHandleW(KERNEL32_STRING);
 }
 
 void Release()
 {
-
 	int i;
 
 	hStaticLeft = (HWND)0;
@@ -213,14 +169,12 @@ void Release()
 			break;
 		}
 	}
-
 }
 
 void GetProcessesList()
 {
-
-	DWORD arraySize, cbNeeded;
 	int i, j, count, index, modulesCount;
+	DWORD arraySize, cbNeeded;
 	BOOL arraysEquals;
 	HANDLE hProcess;
 	HWND hBtn;
@@ -309,7 +263,7 @@ void GetProcessesList()
 				buttonWidth = clientRect.right / 4;
 				buttonHeight = clientRect.bottom / index;
 				for (i = 0; i < index; i++) {
-					if (hBtn = CreateWindowExW(0, buttonClassName, processNames[i], PROCESS_BUTTON_STYLE, 0, buttonHeight * i, buttonWidth, buttonHeight, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL)) {
+					if (hBtn = CreateWindowExW(0, BUTTON_CLASS_NAME, processNames[i], PROCESS_BUTTON_STYLE, 0, buttonHeight * i, buttonWidth, buttonHeight, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL)) {
 						buttons[i] = hBtn;
 					}
 				}
@@ -317,12 +271,10 @@ void GetProcessesList()
 			}
 		}
 	}
-
 }
 
 void ShowInfo(int index)
 {
-
 	int half, quarter, bottom, length;
 	wchar_t *processInfo;
 
@@ -330,13 +282,13 @@ void ShowInfo(int index)
 	quarter = clientRect.right / 4;
 	bottom = clientRect.bottom;
 	if (!hStaticRight) {
-		hStaticRight = CreateWindowExW(0, staticClassName, (wchar_t *)NULL, STATIC_STYLE, half, 0, quarter, bottom, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
+		hStaticRight = CreateWindowExW(0, STATIC_CLASS_NAME, (wchar_t *)NULL, STATIC_STYLE, half, 0, quarter, bottom, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
 		SendMessageW(hStaticRight, WM_SETFONT, (WPARAM)hStaticFont, (LPARAM)TRUE);
 	}
 	if (processInfo = (wchar_t *)calloc(PROCESS_INFO_BUFFER_LENGTH, sizeof(wchar_t))) {
 		GetProcessModulesInfo(index, processInfo);
 		if (!hStaticLeft) {
-			hStaticLeft = CreateWindowExW(0, staticClassName, processInfo, STATIC_STYLE, quarter, 0, quarter, bottom, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
+			hStaticLeft = CreateWindowExW(0, STATIC_CLASS_NAME, processInfo, STATIC_STYLE, quarter, 0, quarter, bottom, hMainWindow, (HMENU)0, (HINSTANCE)0, (LPVOID)NULL);
 			SendMessageW(hStaticLeft, WM_SETFONT, (WPARAM)hStaticFont, (LPARAM)TRUE);
 		} else {
 			SetWindowTextW(hStaticLeft, processInfo);
@@ -351,12 +303,10 @@ void ShowInfo(int index)
 		free(processInfo);
 		processInfo = (wchar_t *)NULL;
 	}
-
 }
 
 void MoveWindows()
 {
-
 	int i, width;
 
 	for (i = 0; i < openedProcessesCount; i++) {
@@ -369,14 +319,10 @@ void MoveWindows()
 	MoveWindow(hLibraryNameEdit, width * 3, 50, width, 50, TRUE);
 	MoveWindow(hFunctionNameEdit, width * 3, 100, width, 50, TRUE);
 	MoveWindow(hInjectButton, width * 3, 150, width, width, TRUE);
-
 }
 
 void GetProcessModulesInfo(int index, wchar_t *result)
 {
-
-	#define BUFFER_SIZE PROCESS_INFO_BUFFER_LENGTH
-
 	int i;
 	wchar_t *moduleName, *moduleSize, moduleNumber[] = L"000";
 
@@ -417,14 +363,10 @@ void GetProcessModulesInfo(int index, wchar_t *result)
 			moduleNumber[2]++;
 		}
 	}
-
-	#undef BUFFER_SIZE
-
 }
 
 HANDLE GetProcessByName(wchar_t *processName)
 {
-	
 	int count, i, index;
 	wchar_t *openedProcessName;
 	DWORD cbNeeded, *processIds;
@@ -468,12 +410,10 @@ HANDLE GetProcessByName(wchar_t *processName)
 	processIds = (DWORD *)NULL;
 
 	return (HANDLE)0;
-
 }
 
 BOOL Inject(wchar_t *fileName, wchar_t *processName, char *functionName)
 {
-
 	DWORD remoteThreadExitCode;
 	HANDLE hRemoteProcess, hLibraryFile, hRemoteThread;
 	HMODULE hTempLibrary;
@@ -481,36 +421,36 @@ BOOL Inject(wchar_t *fileName, wchar_t *processName, char *functionName)
 
 	hLibraryFile = CreateFileW(fileName, FILE_ACCESS_ATTRUBUTES, 0, (SECURITY_ATTRIBUTES *)NULL, OPEN_EXISTING, 0, (HANDLE)NULL);
 	if (GetLastError()) {
-		Error(wrongLibraryNameString, incorrectInputString);
+		Error(WRONG_LIBRARY_NAME_STRING, INCORRECT_INPUT_STRING);
 		return FALSE;
 	}
 	CloseHandle(hLibraryFile);
 	if (!(hTempLibrary = LoadLibraryW(fileName))) {
-		Error(libraryAnalyzeFailString, errorString);
+		Error(LIBRARY_ANALYZE_FAIL_STRING, ERROR_STRING);
 		return FALSE;
 	}
 	if (!(functionOffset = (void *)GetProcAddress(hTempLibrary, functionName))) {
-		Error(wrongFunctionNameString, incorrectInputString);
+		Error(WRONG_FUNCTION_NAME_STRING, INCORRECT_INPUT_STRING);
 		return FALSE;
 	}
 	functionOffset = (void *)((long)functionOffset - (long)hTempLibrary);
 	FreeLibrary(hTempLibrary);
 	hTempLibrary = (HMODULE)0;
 	if (!(hRemoteProcess = GetProcessByName(processName))) {
-		Error(wrongProcessNameString, incorrectInputString);
+		Error(WRONG_PROCESS_NAME_STRING, INCORRECT_INPUT_STRING);
 		return FALSE;
 	}
 	if(!(fileNameRemoteAddress = VirtualAllocEx(hRemoteProcess, (void *)NULL, wcslen(fileName) * sizeof(wchar_t), MEM_COMMIT, PROTECT_FLAGS))) {
-		Error(failAllocatingMemoryString, errorString);
+		Error(FAIL_ALLOCATIONG_MEMORY_STRING, ERROR_STRING);
 		return FALSE;
 	}
 	if (!(WriteProcessMemory(hRemoteProcess, fileNameRemoteAddress, fileName, wcslen(fileName) * sizeof(wchar_t), (SIZE_T *)NULL))) {
-		Error(failCopyingMemoryString, errorString);
+		Error(FAIL_COPYING_MEMORY_STRING, ERROR_STRING);
 		return FALSE;
 	}
-	functionAddress = GetProcAddress(hKernel32, loadLibraryString);
+	functionAddress = GetProcAddress(hKernel32, LOAD_LIBRARY_STRING);
 	if (!(hRemoteThread = CreateRemoteThread(hRemoteProcess, (SECURITY_ATTRIBUTES *)NULL, REMOTE_THREAD_STACK_SIZE, (LPTHREAD_START_ROUTINE)functionAddress, fileNameRemoteAddress, 0, (DWORD *)NULL))) {
-		Error(libraryLoadingFailString, errorString);
+		Error(LIBRARY_LOADING_FAIL_STRING, ERROR_STRING);
 		return FALSE;
 	}
 	WaitForSingleObject(hRemoteThread, INFINITE);
@@ -518,34 +458,28 @@ BOOL Inject(wchar_t *fileName, wchar_t *processName, char *functionName)
 	CloseHandle(hRemoteThread);
 	functionAddress = (void *)((long)remoteThreadExitCode + (long)functionOffset);
 	if (!(hRemoteProcess = CreateRemoteThread(hRemoteProcess, (SECURITY_ATTRIBUTES *)NULL, REMOTE_THREAD_STACK_SIZE, (LPTHREAD_START_ROUTINE)functionAddress, (void *)NULL, 0, (DWORD *)NULL))) {
-		Error(failStartingRemoteProcedureString, incorrectInputString);
+		Error(FAIL_STARTING_REMOTE_PROCEDURE_STRING, INCORRECT_INPUT_STRING);
 		return FALSE;
 	}
 	WaitForSingleObject(hRemoteThread, INFINITE);
 	CloseHandle(hRemoteThread);
-	Info(successString, successString);
+	Info(SUCCESS_STRING, SUCCESS_STRING);
 
 	return TRUE;
-
 }
 
 void Error(const wchar_t *text, const wchar_t *caption)
 {
-
 	MessageBoxW(hMainWindow, text, caption, MB_ICONERROR);
-
 }
 
 void Info(const wchar_t *text, const wchar_t *caption)
 {
-
 	MessageBoxW(hMainWindow, text, caption, MB_ICONINFORMATION);
-
 }
 
 void GetStringFromInt(int value, wchar_t *result)
 {
-
 	int index;
 
 	for (index = 0; index < 10; index++) {
@@ -559,5 +493,4 @@ void GetStringFromInt(int value, wchar_t *result)
 	while (index >= 0) {
 		result[index--] = L' ';
 	}
-
 }
