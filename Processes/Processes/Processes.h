@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef __PROCESSES_H__
 #define __PROCESSES_H__
 
